@@ -1,0 +1,59 @@
+[package]
+name = "cellwidth-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+arbitrary = { version = "1", features = ["derive"] }
+
+[dependencies.cellwidth]
+path = ".."
+
+[[bin]]
+name = "width"
+path = "fuzz_targets/width.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "truncate"
+path = "fuzz_targets/truncate.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "cell"
+path = "fuzz_targets/cell.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "lossless"
+path = "fuzz_targets/lossless.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "table"
+path = "fuzz_targets/table.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "wrap"
+path = "fuzz_targets/wrap.rs"
+test = false
+doc = false
+bench = false
+
+[workspace]

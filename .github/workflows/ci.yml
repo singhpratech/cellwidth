@@ -1,0 +1,223 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    # Weekly, so a new Unicode release or a nightly regression surfaces on its
+    # own rather than the next time somebody happens to touch the repo.
+    - cron: "17 6 * * 1"
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: -D warnings
+
+jobs:
+  test:
+    name: test / ${{ matrix.rust }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        rust: [stable, beta, nightly]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ matrix.rust }}
+      - uses: Swatinem/rust-cache@v2
+      # The crate has no dependencies of any kind, so its own suite runs
+      # without touching the network.
+      - run: cargo test --offline --locked
+      - run: cargo test --offline --locked --release
+
+  features:
+    name: feature combinations
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      # `std` implies `alloc`, so these three are the whole lattice.
+      - run: cargo build --offline --no-default-features
+      - run: cargo build --offline --no-default-features --features alloc
+      - run: cargo build --offline --all-features
+      - run: cargo test --offline --no-default-features --features alloc
+
+  no-std:
+    name: no_std on a bare-metal target
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: thumbv7em-none-eabi
+      - uses: Swatinem/rust-cache@v2
+      # Proves there is no accidental dependency on std, which a host build
+      # with --no-default-features cannot prove on its own.
+      - run: cargo build --offline --no-default-features --target thumbv7em-none-eabi
+      - run: cargo build --offline --no-default-features --features alloc --target thumbv7em-none-eabi
+
+  msrv:
+    name: MSRV 1.75
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.75.0
+      - uses: Swatinem/rust-cache@v2
+      # The oracle package needs a newer compiler than the library does, so the
+      # MSRV job covers cellwidth alone -- which is the crate users depend on.
+      - run: cargo build --offline --no-default-features
+      - run: cargo build --offline --all-features
+      - run: cargo test --offline -p cellwidth
+
+  oracles:
+    name: differential vs other implementations
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      # The only job that needs the network: it builds unicode-width and
+      # unicode-segmentation to disagree with. A separate package, so the
+      # library's own lockfile stays empty.
+      - run: cargo test --manifest-path oracles/Cargo.toml --locked
+
+  lint:
+    name: fmt, clippy, docs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo fmt --all --check
+      - run: cargo fmt --manifest-path oracles/Cargo.toml --all --check
+      - run: cargo clippy --all-targets --all-features -- -D warnings
+      - run: cargo clippy --manifest-path oracles/Cargo.toml --all-targets -- -D warnings
+      - run: cargo clippy --manifest-path probe/Cargo.toml --all-targets -- -D warnings
+      - run: cargo fmt --manifest-path probe/Cargo.toml --all --check
+      - run: cargo doc --no-deps --all-features
+        env:
+          RUSTDOCFLAGS: -D warnings
+
+  miri:
+    name: miri
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: miri
+      - uses: Swatinem/rust-cache@v2
+      # `unsafe` is forbidden in the crate, so this is really checking the
+      # table indexing and slicing against the interpreter's rules. The two
+      # conformance suites are ~26,000 cases of pure arithmetic over `&str`;
+      # they take hours under the interpreter and prove nothing it can see.
+      - run: |
+          cargo miri test -p cellwidth -- \
+            --skip line_break_test --skip grapheme_break_test
+
+  coverage:
+    name: coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: llvm-tools-preview
+      - uses: taiki-e/install-action@cargo-llvm-cov
+      - uses: Swatinem/rust-cache@v2
+      # Measured on cellwidth's own suite, so coverage never depends on an
+      # external crate. The generated tables are data, not logic.
+      # Both thresholds are enforced. Region coverage is reported but not
+      # gated: the merged report claims one uncovered region in ansi.rs whose
+      # segment data shows no uncovered segment at all, and a lib-only run
+      # covers those lines. It is a reporting artifact, not a gap, and gating
+      # on it would mean gating on a number nothing can move.
+      - name: enforce full line and function coverage
+        run: |
+          cargo llvm-cov -p cellwidth --all-features \
+            --ignore-filename-regex 'tables\.rs' \
+            --fail-under-lines 100 --fail-under-functions 100 --summary-only
+      - name: upload lcov
+        run: cargo llvm-cov report --lcov --output-path lcov.info
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lcov
+          path: lcov.info
+
+  fuzz:
+    name: fuzz smoke
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [width, truncate, cell, lossless, wrap, table]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+      - uses: taiki-e/install-action@cargo-fuzz
+      - uses: Swatinem/rust-cache@v2
+      # A short run per PR. The long campaigns are run by hand; this exists to
+      # catch a target that stops building or breaks on its seed corpus.
+      - run: cargo fuzz run ${{ matrix.target }} -- -max_total_time=60
+        working-directory: fuzz
+
+  semver:
+    name: semver
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: taiki-e/install-action@cargo-semver-checks
+      - uses: Swatinem/rust-cache@v2
+      # Compares against the base branch rather than a published version, so
+      # this works before the first release too.
+      - run: cargo semver-checks --baseline-rev ${{ github.event.pull_request.base.sha }} -p cellwidth
+
+  package:
+    name: publish dry run
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo publish --dry-run -p cellwidth --locked
+
+  terminals:
+    name: re-record real terminals
+    runs-on: ubuntu-latest
+    # Scheduled only, and advisory: this installs terminal emulators and drives
+    # them under Xvfb, which is worth knowing about but not worth blocking a PR.
+    if: github.event_name == 'schedule'
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: install terminals
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb python3-gi gir1.2-vte-2.91 alacritty
+          curl -sSL https://sw.kovidgoyal.net/kitty/installer.sh \
+            | sh /dev/stdin dest=$HOME/.local launch=n
+          echo "$HOME/.local/kitty.app/bin" >> "$GITHUB_PATH"
+      - run: ./probe/drivers/run_all.sh
+      - name: fail if a terminal changed its mind
+        run: git diff --exit-code tests/data/terminals/
+
+  unicode-freshness:
+    name: unicode is current
+    runs-on: ubuntu-latest
+    # Only on the schedule: a new UCD release is news, not a reason to block a
+    # pull request that has nothing to do with it.
+    if: github.event_name == 'schedule'
+    steps:
+      - uses: actions/checkout@v4
+      - run: ./tools/check_ucd_version.sh

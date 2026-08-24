@@ -1,0 +1,35 @@
+[package]
+name = "cellwidth"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.75"
+description = "Terminal display width that gets emoji, CJK and ANSI colour right. Measure, truncate, pad and wrap text so columns actually line up. No dependencies, no_std."
+keywords = ["terminal", "unicode", "width", "cli", "truncate"]
+categories = ["command-line-interface", "text-processing", "no-std"]
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/singhpratech/cellwidth"
+readme = "README.md"
+exclude = ["tools/", "ucd/", "fuzz/", "oracles/"]
+
+# docs.rs builds with every feature so the alloc-only APIs are documented.
+# Feature labelling is automatic on current rustdoc; no cfg needed.
+[package.metadata.docs.rs]
+all-features = true
+
+[features]
+default = ["std"]
+std = ["alloc"]
+alloc = []
+
+[dependencies]
+# Intentionally none, and it stays that way.
+
+# Deliberately an empty workspace: `oracles/` and `fuzz/` are separate packages
+# with their own manifests. If they were members, their dependencies would have
+# to resolve before anything here could build, and `cargo test --offline` would
+# stop working on a clean machine.
+[workspace]
+
+[lints.rust]
+missing_docs = "warn"
+unsafe_code = "forbid"

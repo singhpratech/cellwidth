@@ -1,0 +1,28 @@
+[package]
+name = "cellwidth-oracles"
+version = "0.0.0"
+publish = false
+edition = "2021"
+description = "Differential tests for cellwidth against independent implementations."
+
+# These oracles exist only to disagree with cellwidth. Keeping them in a
+# separate package means the published crate has no dependencies *and* no
+# dev-dependencies, and its own test suite runs offline on the MSRV.
+[dependencies]
+cellwidth = { path = ".." }
+unicode-width = "0.2"
+unicode-segmentation = "1"
+
+[[test]]
+name = "differential"
+path = "tests/differential.rs"
+
+[[example]]
+name = "diff_oracles"
+path = "examples/diff_oracles.rs"
+
+[[example]]
+name = "diff_strings"
+path = "examples/diff_strings.rs"
+
+[workspace]

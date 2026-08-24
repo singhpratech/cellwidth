@@ -1,0 +1,35 @@
+# terminal	kitty(0.48.2)
+# TERM	xterm-kitty
+id	codepoints	terminal	cellwidth	note
+ascii	0061 0062 0063	3	3	plain ASCII
+cjk	65E5 672C 8A9E	6	6	East Asian Wide
+accent-precomp	0063 0061 0066 00E9	4	4	precomposed e-acute
+accent-decomp	0063 0061 0066 0065 0301	4	4	combining acute
+emoji-basic	1F600	2	2	emoji-presentation base
+zwj-family	1F468 200D 1F469 200D 1F467 200D 1F466	2	2	ZWJ sequence: one glyph or four?
+zwj-astronaut	1F469 1F3FE 200D 1F680	2	2	modifier plus ZWJ
+skin-tone	1F44D 1F3FD	2	2	emoji base plus modifier
+text-emoji-mod	270C 1F3FB	2	2	text-default base plus modifier
+vs16	2764 FE0F	2	2	VS16 asks for emoji presentation
+vs15	231A FE0E	1	1	VS15 asks for text presentation
+bare-heart	2764	1	1	no selector: text dingbat
+keycap	0031 FE0F 20E3	2	2	keycap sequence
+flag	1F1EF 1F1F5	2	2	regional indicator pair
+lone-ri	1F1EF	2	2	unpaired regional indicator
+bengali-ka-aa	0995 09BE	1	1	Mc spacing mark that is also Other_Grapheme_Extend
+devanagari-ksi	0915 094D 0937 093F	1	1	Indic conjunct with shaping
+hangul-filler	3164	2	2	blank, but East Asian Wide
+choseong-filler	115F	2	2	default-ignorable and Wide
+halfwidth-dakuten	FF76 FF9E	1	1	halfwidth katakana plus sound mark
+hangul-tone	AC00 302E	2	2	Hangul syllable plus tone mark
+jamo-decomposed	1112 1161 11AB	2	2	L+V+T composing into one syllable
+trigram	2630	2	2	became Wide in Unicode 16
+counting-rod	1D360	2	2	became Wide in Unicode 16
+arabic-number-sign	0600 0039	1	1	invisible prepend format character
+soft-hyphen	0061 00AD 0062	2	2	soft hyphen
+amb-plusminus	00B1	1	1	ambiguous
+amb-degree	00B0	1	1	ambiguous
+amb-section	00A7	1	1	ambiguous
+amb-alpha	03B1	1	1	ambiguous
+amb-arrow	2192	1	1	ambiguous
+amb-boxdraw	2500	1	1	ambiguous

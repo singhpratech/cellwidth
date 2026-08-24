@@ -1,0 +1,19 @@
+# Build output
+target
+fuzz/target
+fuzz/corpus
+fuzz/artifacts
+oracles/target
+probe/target
+
+# Downloaded Unicode data (regenerate with tools/gen_tables.py)
+/ucd
+
+# Local tooling and private working notes — never published.
+# Listed here, not just in a global gitignore, so this holds on every clone.
+.claude/
+.private/
+*.local.md
+*.local.json
+scratch/
+notes/

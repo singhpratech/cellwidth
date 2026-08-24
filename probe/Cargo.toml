@@ -1,0 +1,27 @@
+[package]
+name = "cellwidth-probe"
+version = "0.0.0"
+publish = false
+edition = "2021"
+description = "Ask a real terminal how wide it drew something, and compare with cellwidth."
+
+[dependencies]
+cellwidth = { path = ".." }
+
+[[bin]]
+name = "probe"
+path = "src/bin/probe.rs"
+
+[[bin]]
+name = "detect"
+path = "src/bin/detect.rs"
+
+[[bin]]
+name = "score"
+path = "src/bin/score.rs"
+
+[[bin]]
+name = "compare"
+path = "src/bin/compare.rs"
+
+[workspace]
