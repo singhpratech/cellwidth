@@ -6,6 +6,14 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-08-24
+
+### Changed
+
+- Crate metadata: `homepage` points at the project site,
+  <https://singhpratech.github.io/cellwidth/>, and `documentation` at docs.rs.
+  No code changes.
+
 ## [1.0.0] - 2026-08-24
 
 The API is stable from here: additions only in 1.x.
@@ -111,7 +119,8 @@ regression test naming the oracle that caught it:
 - Any escape ending in `m` was treated as an SGR colour code, so `wrap` injected
   resets into unstyled text.
 
-[Unreleased]: https://github.com/singhpratech/cellwidth/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/singhpratech/cellwidth/compare/v1.0.1...HEAD
+[1.0.1]: https://github.com/singhpratech/cellwidth/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/singhpratech/cellwidth/compare/v0.1.1...v1.0.0
 [0.1.1]: https://github.com/singhpratech/cellwidth/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/singhpratech/cellwidth/releases/tag/v0.1.0

@@ -1,13 +1,15 @@
 [package]
 name = "cellwidth"
-version = "1.0.0"
+version = "1.0.1"
 edition = "2021"
 rust-version = "1.75"
 description = "Terminal display width that gets emoji, CJK and ANSI colour right. Measure, truncate, pad and wrap text so columns actually line up. No dependencies, no_std."
 keywords = ["terminal", "unicode", "width", "cli", "truncate"]
 categories = ["command-line-interface", "text-processing", "no-std"]
 license = "MIT OR Apache-2.0"
+homepage = "https://singhpratech.github.io/cellwidth/"
 repository = "https://github.com/singhpratech/cellwidth"
+documentation = "https://docs.rs/cellwidth"
 readme = "README.md"
 exclude = ["tools/", "ucd/", "fuzz/", "oracles/", "probe/", "web/", "docs/", ".github/"]
 
