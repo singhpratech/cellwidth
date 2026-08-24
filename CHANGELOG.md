@@ -6,6 +6,14 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-08-24
+
+### Changed
+
+- Crate logo and favicon on docs.rs. No code changes.
+
+## [0.1.0] - 2026-08-24
+
 ### Added
 
 - `width`, `char_width`, `truncate`, `cell`, `pad_start`, `pad_end`, `center`,
@@ -74,4 +82,6 @@ regression test naming the oracle that caught it:
 - Any escape ending in `m` was treated as an SGR colour code, so `wrap` injected
   resets into unstyled text.
 
-[Unreleased]: https://github.com/singhpratech/cellwidth/commits/main
+[Unreleased]: https://github.com/singhpratech/cellwidth/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/singhpratech/cellwidth/compare/v0.1.0...v0.1.1
+[0.1.0]: https://github.com/singhpratech/cellwidth/releases/tag/v0.1.0

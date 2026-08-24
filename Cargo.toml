@@ -1,6 +1,6 @@
 [package]
 name = "cellwidth"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 rust-version = "1.75"
 description = "Terminal display width that gets emoji, CJK and ANSI colour right. Measure, truncate, pad and wrap text so columns actually line up. No dependencies, no_std."
