@@ -167,7 +167,10 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       # A short run per PR. The long campaigns are run by hand; this exists to
       # catch a target that stops building or breaks on its seed corpus.
-      - run: cargo fuzz run ${{ matrix.target }} -- -max_total_time=60
+      # cargo-fuzz defaults --target to the triple it was itself built for, and
+      # install-action ships a musl-static binary. That would fuzz against musl,
+      # which is not installed here and cannot take a sanitizer. Pin to the host.
+      - run: cargo fuzz run --target "$(rustc -vV | sed -n 's|host: ||p')" ${{ matrix.target }} -- -max_total_time=60
         working-directory: fuzz
 
   semver:
