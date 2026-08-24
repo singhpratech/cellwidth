@@ -170,7 +170,9 @@ jobs:
       # cargo-fuzz defaults --target to the triple it was itself built for, and
       # install-action ships a musl-static binary. That would fuzz against musl,
       # which is not installed here and cannot take a sanitizer. Pin to the host.
-      - run: cargo fuzz run --target "$(rustc -vV | sed -n 's|host: ||p')" ${{ matrix.target }} -- -max_total_time=60
+      - run: |
+          cargo fuzz run --target "$(rustc -vV | sed -n 's|host: ||p')" \
+            ${{ matrix.target }} -- -max_total_time=60
         working-directory: fuzz
 
   semver:
