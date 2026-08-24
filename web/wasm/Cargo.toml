@@ -1,0 +1,22 @@
+[package]
+name = "cellwidth-wasm"
+version = "0.0.0"
+edition = "2021"
+publish = false
+license = "MIT OR Apache-2.0"
+description = "WASM shim that runs cellwidth in the browser demo. Not published."
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+cellwidth = { path = "../.." }
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
+
+[workspace]

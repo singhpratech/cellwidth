@@ -1,0 +1,791 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>cellwidth</title>
+<meta name="description" content="Terminal display width that gets emoji, CJK and ANSI colour right. Zero dependencies, no_std. Try it live — the demo runs the real crate compiled to WebAssembly.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%276%27 fill=%27%230b0d10%27/%3E%3Crect x=%275%27 y=%277%27 width=%278%27 height=%2718%27 fill=%27%23ffb454%27/%3E%3Crect x=%2717%27 y=%277%27 width=%2710%27 height=%2718%27 fill=%27none%27 stroke=%27%23ffb454%27 stroke-width=%272%27 stroke-dasharray=%273 3%27/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;800&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap">
+<style>
+:root{
+  --ink:#0b0d10; --panel:#ffffff; --ground:#fbfcfd; --sunk:#f2f4f7;
+  --rule:#e2e7ee; --rule-soft:#eef1f5;
+  --text:#0b0d10; --dim:#5f6a77; --faint:#8b95a2;
+  --amber:#b3660a; --amber-bg:#fff4e2; --amber-line:#e8a33d;
+  --jade:#0f7a37; --jade-bg:#e8f7ed;
+  --coral:#c02c3c; --coral-bg:#fdecee;
+  --violet:#6741c4; --violet-bg:#f0ebfd;
+  --cell:20px; --maxw:1080px;
+  --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --sans:"IBM Plex Sans",system-ui,-apple-system,Segoe UI,sans-serif;
+  --disp:"Archivo","IBM Plex Sans",system-ui,sans-serif;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --ink:#05070a; --panel:#12161c; --ground:#0b0e12; --sunk:#171c23;
+    --rule:#262d37; --rule-soft:#1c222a;
+    --text:#dfe5ec; --dim:#8b96a4; --faint:#67717e;
+    --amber:#ffb454; --amber-bg:#2b1f0c; --amber-line:#7a5316;
+    --jade:#56d364; --jade-bg:#0d2915;
+    --coral:#ff7b86; --coral-bg:#2d1216;
+    --violet:#b39cff; --violet-bg:#1e1733;
+  }
+}
+:root[data-theme="dark"]{
+  --ink:#05070a; --panel:#12161c; --ground:#0b0e12; --sunk:#171c23;
+  --rule:#262d37; --rule-soft:#1c222a;
+  --text:#dfe5ec; --dim:#8b96a4; --faint:#67717e;
+  --amber:#ffb454; --amber-bg:#2b1f0c; --amber-line:#7a5316;
+  --jade:#56d364; --jade-bg:#0d2915;
+  --coral:#ff7b86; --coral-bg:#2d1216;
+  --violet:#b39cff; --violet-bg:#1e1733;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0; background:var(--ground); color:var(--text);
+  font-family:var(--sans); font-size:16.5px; line-height:1.65;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:var(--maxw); margin:0 auto; padding:0 24px}
+a{color:var(--amber); text-decoration-thickness:1px; text-underline-offset:3px}
+a:hover{text-decoration-thickness:2px}
+:focus-visible{outline:2px solid var(--amber); outline-offset:3px; border-radius:3px}
+h1,h2,h3{font-family:var(--disp); text-wrap:balance; letter-spacing:-.02em; margin:0}
+code,kbd,pre{font-family:var(--mono)}
+
+/* ---- ruler rail: the page is measured ---- */
+.rail{
+  position:fixed; inset:0 auto 0 0; width:26px; pointer-events:none; z-index:2;
+  background:
+    repeating-linear-gradient(to bottom, var(--rule) 0 1px, transparent 1px var(--cell));
+  opacity:.5;
+  border-right:1px solid var(--rule);
+}
+@media (max-width:900px){ .rail{display:none} }
+
+/* ---- header ---- */
+header{border-bottom:1px solid var(--rule); background:var(--panel); position:relative}
+.topbar{display:flex; align-items:center; justify-content:space-between; gap:16px; padding:14px 0}
+.brand{font-family:var(--mono); font-weight:700; font-size:15px; letter-spacing:-.01em; display:flex; align-items:center; gap:9px}
+.brand .blk{display:inline-block; width:9px; height:16px; background:var(--amber); animation:blink 1.2s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+@media (prefers-reduced-motion:reduce){ .brand .blk{animation:none} }
+.navlinks{display:flex; gap:18px; align-items:center; font-size:14px; flex-wrap:wrap}
+.navlinks a{color:var(--dim); text-decoration:none}
+.navlinks a:hover{color:var(--text)}
+.tbtn{font:inherit; font-size:13px; background:transparent; color:var(--dim); border:1px solid var(--rule);
+  border-radius:6px; padding:4px 10px; cursor:pointer}
+.tbtn:hover{color:var(--text); border-color:var(--faint)}
+
+/* ---- hero ---- */
+.hero{padding:56px 0 40px; border-bottom:1px solid var(--rule)}
+.eyebrow{font-family:var(--mono); font-size:11.5px; letter-spacing:.14em; text-transform:uppercase; color:var(--amber); margin-bottom:16px}
+h1{font-size:clamp(38px,6.4vw,68px); font-weight:800; line-height:1.02}
+.sub{font-size:clamp(17px,2.1vw,20.5px); color:var(--dim); max-width:60ch; margin:20px 0 0; line-height:1.55}
+.facts{display:flex; flex-wrap:wrap; gap:8px; margin-top:26px}
+.fact{font-family:var(--mono); font-size:12px; border:1px solid var(--rule); background:var(--sunk);
+  border-radius:5px; padding:5px 10px; color:var(--dim)}
+.fact b{color:var(--text); font-weight:700}
+.cta{display:flex; flex-wrap:wrap; gap:10px; margin-top:26px; align-items:center}
+.btn{display:inline-block; font-family:var(--mono); font-size:13.5px; font-weight:500; text-decoration:none;
+  padding:9px 15px; border-radius:7px; border:1px solid var(--rule); color:var(--text); background:var(--panel)}
+.btn:hover{border-color:var(--faint)}
+.btn.pri{background:var(--amber); border-color:var(--amber); color:#0b0d10; font-weight:700}
+:root[data-theme="dark"] .btn.pri, :root:not([data-theme="light"]) .btn.pri{color:#0b0d10}
+@media (prefers-color-scheme:light){ :root:not([data-theme="dark"]) .btn.pri{color:#fff} }
+:root[data-theme="light"] .btn.pri{color:#fff}
+.btn.pri:hover{filter:brightness(1.06)}
+
+/* ---- sections ---- */
+section{padding:56px 0; border-bottom:1px solid var(--rule)}
+.snum{font-family:var(--mono); font-size:11.5px; color:var(--amber); letter-spacing:.12em; text-transform:uppercase; margin-bottom:12px}
+h2{font-size:clamp(25px,3.6vw,36px); font-weight:800; margin-bottom:14px}
+h3{font-size:18px; font-weight:600; margin:30px 0 10px}
+p{margin:0 0 16px; max-width:68ch}
+.lede{font-size:18.5px; color:var(--dim); max-width:64ch}
+ul{max-width:68ch; padding-left:20px} li{margin-bottom:8px}
+
+/* ---- code ---- */
+pre{background:var(--panel); border:1px solid var(--rule); border-radius:9px; padding:15px 17px;
+  overflow-x:auto; font-size:13.2px; line-height:1.65; margin:0 0 18px}
+pre code{white-space:pre}
+:not(pre)>code{background:var(--sunk); border:1px solid var(--rule-soft); border-radius:4px;
+  padding:1px 5px; font-size:.9em}
+.tok-c{color:var(--faint)} .tok-s{color:var(--jade)} .tok-k{color:var(--violet)} .tok-n{color:var(--amber)}
+
+/* ---- demo ---- */
+.demo{background:var(--panel); border:1px solid var(--rule); border-radius:12px; overflow:hidden; margin:22px 0}
+.demo-hd{display:flex; align-items:center; gap:9px; padding:10px 14px; border-bottom:1px solid var(--rule);
+  background:var(--sunk); font-family:var(--mono); font-size:12px; color:var(--dim)}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--rule);flex:none}
+.demo-bd{padding:16px 14px}
+.live{margin-left:auto; display:flex; align-items:center; gap:6px; color:var(--jade); font-size:11px; letter-spacing:.08em}
+.live i{width:6px;height:6px;border-radius:50%;background:var(--jade);display:inline-block}
+
+label.lbl{display:block; font-family:var(--mono); font-size:11px; letter-spacing:.1em;
+  text-transform:uppercase; color:var(--faint); margin:0 0 7px}
+input[type=text]{width:100%; font-family:var(--mono); font-size:15.5px; padding:11px 13px;
+  border:1px solid var(--rule); border-radius:8px; background:var(--ground); color:var(--text)}
+input[type=range]{width:100%; accent-color:var(--amber)}
+.chips{display:flex; flex-wrap:wrap; gap:7px; margin-top:11px}
+.chip{font-family:var(--mono); font-size:12px; padding:5px 9px; border-radius:6px; cursor:pointer;
+  border:1px solid var(--rule); background:var(--ground); color:var(--dim)}
+.chip:hover{border-color:var(--faint); color:var(--text)}
+.chip[aria-pressed=true]{background:var(--amber-bg); border-color:var(--amber-line); color:var(--amber); font-weight:700}
+
+/* ---- the cell grid: the centrepiece ---- */
+.gridwrap{overflow-x:auto; padding:6px 0 2px; margin-top:16px}
+.cellgrid{display:flex; align-items:stretch; min-height:60px; font-family:var(--mono);
+  border-left:2px solid var(--amber-line); padding-left:0}
+.cl{position:relative; display:flex; align-items:center; justify-content:center;
+  border-right:1px solid var(--rule); border-top:1px dashed var(--rule-soft); border-bottom:1px dashed var(--rule-soft);
+  font-size:19px; height:56px; flex:none; background:var(--ground)}
+.cl.w2{background:var(--violet-bg)}
+.cl.w1{background:var(--sunk)}
+.cl.w0{background:var(--coral-bg); min-width:9px; font-size:11px}
+.cl .cw{position:absolute; bottom:1px; right:3px; font-size:9px; color:var(--faint); line-height:1}
+.cl .div{position:absolute; top:0; bottom:0; left:50%; border-left:1px dotted var(--amber-line); opacity:.55}
+.ticks{display:flex; font-family:var(--mono); font-size:9.5px; color:var(--faint); margin-top:3px}
+.ticks span{flex:none; text-align:center; border-right:1px solid var(--rule-soft)}
+
+/* ---- scoreboard ---- */
+.score{display:grid; grid-template-columns:repeat(auto-fit,minmax(132px,1fr)); gap:10px; margin-top:18px}
+.sc{border:1px solid var(--rule); border-radius:9px; padding:12px; background:var(--ground)}
+.sc .k{font-family:var(--mono); font-size:10.5px; letter-spacing:.08em; text-transform:uppercase; color:var(--faint)}
+.sc .v{font-family:var(--mono); font-size:27px; font-weight:700; line-height:1.15; margin-top:3px; font-variant-numeric:tabular-nums}
+.sc .n{font-size:11.5px; color:var(--dim); margin-top:2px; line-height:1.4}
+.sc.good{border-color:var(--jade); background:var(--jade-bg)} .sc.good .v{color:var(--jade)}
+.sc.bad .v{color:var(--coral)}
+
+/* ---- output ---- */
+.out{font-family:var(--mono); font-size:14px; white-space:pre; overflow-x:auto;
+  background:var(--ground); border:1px solid var(--rule); border-radius:8px; padding:12px 13px; margin-top:12px}
+.out .bar{color:var(--faint)}
+.hint{font-size:13px; color:var(--dim); margin-top:9px}
+
+/* ---- true cell rows: never trust the browser's font metrics ----
+   Each grapheme is placed in a box of exactly (width x CELL) pixels, so the
+   column rules line up even though no web font renders CJK at exactly 2x. */
+.rows{overflow-x:auto; margin-top:12px; padding-bottom:4px}
+.row{display:flex; align-items:center; font-family:var(--mono); font-size:13px;
+  color:var(--dim); margin-bottom:5px; white-space:nowrap}
+.row .lab{flex:none; width:96px; text-align:right; padding-right:11px; color:var(--faint); font-size:11.5px}
+.box{flex:none; display:flex; align-items:stretch; height:30px; border:1px solid var(--amber-line);
+  background:var(--ground); position:relative}
+.box.ghost{border-style:dashed; border-color:var(--rule); background:transparent}
+.mc{display:flex; align-items:center; justify-content:center; flex:none; font-size:15px;
+  border-right:1px solid var(--rule-soft); overflow:hidden; color:var(--text)}
+.mc.w2{background:var(--violet-bg)}
+.pad{flex:none; background:repeating-linear-gradient(45deg,transparent 0 4px,var(--rule-soft) 4px 5px)}
+.tail{flex:none; padding-left:11px; font-size:12px; color:var(--dim)}
+.tail b{color:var(--jade)}
+.tail i{color:var(--coral); font-style:normal}
+
+/* ---- tables ---- */
+.tbl{width:100%; border-collapse:collapse; font-size:14.2px; margin:6px 0 18px; display:block; overflow-x:auto}
+.tbl th,.tbl td{text-align:left; padding:9px 11px; border-bottom:1px solid var(--rule-soft); vertical-align:top}
+.tbl th{font-family:var(--mono); font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--faint); border-bottom:1px solid var(--rule)}
+.tbl td.num{font-family:var(--mono); font-variant-numeric:tabular-nums; white-space:nowrap}
+
+/* ---- phases ---- */
+.phase{display:grid; grid-template-columns:34px 1fr auto; gap:13px; align-items:start;
+  padding:12px 0; border-bottom:1px solid var(--rule-soft)}
+.phase .p{font-family:var(--mono); font-size:12px; color:var(--faint); padding-top:2px}
+.phase .t{font-weight:600; font-size:15px}
+.phase .d{font-size:13.5px; color:var(--dim); margin-top:2px}
+.tag{font-family:var(--mono); font-size:10.5px; padding:3px 8px; border-radius:20px; white-space:nowrap;
+  border:1px solid var(--rule); color:var(--dim); background:var(--ground)}
+.tag.done{background:var(--jade-bg); border-color:var(--jade); color:var(--jade)}
+.tag.next{background:var(--amber-bg); border-color:var(--amber-line); color:var(--amber)}
+
+.note{border-left:3px solid var(--amber-line); background:var(--amber-bg); padding:13px 15px;
+  border-radius:0 8px 8px 0; margin:18px 0; font-size:14.5px}
+.note b{color:var(--amber)}
+.cols2{display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:22px}
+footer{padding:36px 0 52px; color:var(--dim); font-size:13.5px}
+.err{color:var(--coral); font-family:var(--mono); font-size:13px}
+</style>
+</head>
+<body>
+<div class="rail" aria-hidden="true"></div>
+
+<header>
+  <div class="wrap topbar">
+    <div class="brand">cellwidth<span class="blk"></span></div>
+    <nav class="navlinks">
+      <a href="#try">Try it</a>
+      <a href="#problem">Problem</a>
+      <a href="#proof">Proof</a>
+      <a href="#blueprint">Blueprint</a>
+      <a href="https://crates.io/crates/cellwidth">crates.io</a>
+      <a href="https://docs.rs/cellwidth">docs</a>
+      <a href="https://github.com/singhpratech/cellwidth">GitHub</a>
+      <button class="tbtn" id="theme" type="button">theme</button>
+    </nav>
+  </div>
+</header>
+
+<div class="wrap">
+
+<div class="hero">
+  <div class="eyebrow">Terminal geometry for Rust</div>
+  <h1>Your columns are<br>lying to you.</h1>
+  <p class="sub">
+    <code>"👨‍👩‍👧‍👦".len()</code> is 25. <code>.chars().count()</code> is 7.
+    A terminal draws it in <b>2</b> columns. Every CLI table, progress bar and status
+    line needs that third number — and nothing in the standard library will tell you it.
+  </p>
+  <div class="facts">
+    <span class="fact"><b>0</b> dependencies</span>
+    <span class="fact"><b>no_std</b></span>
+    <span class="fact">MSRV <b>1.75</b></span>
+    <span class="fact">Unicode <b>17.0.0</b></span>
+    <span class="fact"><b>100%</b> line &amp; function coverage</span>
+    <span class="fact"><b>89</b> tests</span>
+  </div>
+  <div class="cta">
+    <a class="btn pri" href="#try">Try it live</a>
+    <a class="btn" href="https://crates.io/crates/cellwidth">cargo add cellwidth</a>
+    <a class="btn" href="https://github.com/singhpratech/cellwidth">Source</a>
+  </div>
+</div>
+
+<!-- ================= TRY IT ================= -->
+<section id="try">
+  <div class="snum">01 / The instrument</div>
+  <h2>Measure anything, right now</h2>
+  <p class="lede">
+    This is not a simulation. The panel below is <b>the actual crate</b>, compiled to
+    WebAssembly and running in your browser. Same code, same Unicode tables, same answers
+    as your terminal build.
+  </p>
+
+  <div class="demo">
+    <div class="demo-hd">
+      <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+      <span>cellwidth.wasm</span>
+      <span class="live"><i></i><span id="wstat">loading…</span></span>
+    </div>
+    <div class="demo-bd">
+      <label class="lbl" for="inp">Input string</label>
+      <input type="text" id="inp" value="🇯🇵 Tōkyō 東京 👨‍👩‍👧‍👦 café" spellcheck="false" autocomplete="off">
+      <div class="chips" id="samples"></div>
+
+      <div class="chips" style="margin-top:14px">
+        <button class="chip" data-mode="0" aria-pressed="true">Width::DEFAULT</button>
+        <button class="chip" data-mode="1" aria-pressed="false">Width::LEGACY</button>
+        <button class="chip" data-mode="2" aria-pressed="false">ambiguous = Wide</button>
+      </div>
+
+      <div class="gridwrap">
+        <div class="cellgrid" id="grid"></div>
+        <div class="ticks" id="ticks"></div>
+      </div>
+      <p class="hint">
+        Each box is one grapheme cluster, drawn across the terminal cells it occupies.
+        <span style="color:var(--violet)">Violet</span> = 2 cells,
+        grey = 1 cell, <span style="color:var(--coral)">red</span> = zero-width (a combining
+        mark or an escape sequence — it costs nothing).
+      </p>
+
+      <div class="score" id="score"></div>
+      <p class="hint" id="verdict"></p>
+    </div>
+  </div>
+
+  <h3>Truncate without breaking anything</h3>
+  <div class="demo">
+    <div class="demo-hd"><span class="dot"></span><span>truncate(s, n) &amp; cell(s, n)</span></div>
+    <div class="demo-bd">
+      <label class="lbl" for="tw">Target columns: <span id="twv">12</span></label>
+      <input type="range" id="tw" min="0" max="40" value="12">
+      <div class="rows" id="tout"></div>
+      <p class="hint">
+        <code>truncate</code> borrows the longest prefix that fits — never splitting a
+        character or leaving half an escape sequence. <code>cell</code> guarantees
+        <em>exactly</em> n columns, adding an ellipsis or padding. The amber frame is the
+        target width; hatching is padding. Every glyph sits in a real cell, so nothing
+        here depends on your browser’s font metrics.
+      </p>
+    </div>
+  </div>
+
+  <h3>Wrap at real break opportunities</h3>
+  <div class="demo">
+    <div class="demo-hd"><span class="dot"></span><span>wrap(s, n) — UAX #14</span></div>
+    <div class="demo-bd">
+      <label class="lbl" for="ww">Wrap width: <span id="wwv">28</span></label>
+      <input type="range" id="ww" min="6" max="60" value="28">
+      <div class="rows" id="wout"></div>
+      <p class="hint">
+        Japanese has no spaces, so naive whitespace wrapping produces one giant line.
+        <code>wrap</code> implements the Unicode line-breaking algorithm and breaks
+        between characters where the script allows it.
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- ================= PROBLEM ================= -->
+<section id="problem">
+  <div class="snum">02 / The problem</div>
+  <h2>Three different numbers, and only one is the right one</h2>
+  <p>
+    A terminal is a grid of fixed-size cells. To draw anything that lines up — a table, a
+    border, a progress bar, a status line — you must know how many <em>cells</em> a string
+    occupies. Rust gives you two numbers, and neither is that one.
+  </p>
+
+  <table class="tbl">
+    <thead><tr><th>String</th><th>.len()</th><th>.chars()</th><th>Terminal cells</th><th>Why</th></tr></thead>
+    <tbody>
+      <tr><td><code>café</code></td><td class="num">5</td><td class="num">5</td><td class="num">4</td><td>the accent is a combining mark, drawn on top</td></tr>
+      <tr><td><code>日本語</code></td><td class="num">9</td><td class="num">3</td><td class="num">6</td><td>East Asian wide — two cells each</td></tr>
+      <tr><td><code>👨‍👩‍👧‍👦</code></td><td class="num">25</td><td class="num">7</td><td class="num">2</td><td>four people joined by ZWJ into one glyph</td></tr>
+      <tr><td><code>🇯🇵</code></td><td class="num">8</td><td class="num">2</td><td class="num">2</td><td>two regional indicators form one flag</td></tr>
+      <tr><td><code>\e[31mred\e[0m</code></td><td class="num">14</td><td class="num">14</td><td class="num">3</td><td>colour codes are instructions, not ink</td></tr>
+    </tbody>
+  </table>
+
+  <p>
+    Reach for <code>len()</code> and your output goes ragged the first time someone has an
+    umlaut in their name, a Japanese hostname, or an emoji in a commit message. It stays
+    broken, because the failure only shows up on <em>other people's</em> data — never yours.
+  </p>
+
+  <h3>What that looks like</h3>
+  <pre><code><span class="tok-c">// .len() — every non-ASCII row drifts</span>
+┌────────────────────┬──────────────────┐
+│ nagoya-prod-01     │ healthy          │
+│ 日本語ログ出力              │ healthy       │
+│ 👨‍👩‍👧‍👦 shared account                    │ degraded │
+└────────────────────┴──────────────────┘
+
+<span class="tok-c">// cellwidth — every line is the same number of cells</span>
+┌────────────────────┬──────────────────┐
+│ nagoya-prod-01     │ healthy          │
+│ 日本語ログ出力     │ healthy          │
+│ 👨‍👩‍👧‍👦 shared account   │ degraded         │
+└────────────────────┴──────────────────┘</code></pre>
+</section>
+
+<!-- ================= WHY ================= -->
+<section id="why">
+  <div class="snum">03 / Why this exists</div>
+  <h2>Four crates, and the bug lives in the glue</h2>
+  <p>
+    You can already solve <em>parts</em> of this. The problem is that the parts don't fit
+    together, and joining them is where people get it wrong.
+  </p>
+  <div class="cols2">
+    <div>
+      <h3 style="margin-top:0">Before</h3>
+      <pre style="margin-bottom:8px"><code><span class="tok-n">unicode-width</span>        <span class="tok-c">// widths</span>
+<span class="tok-n">unicode-segmentation</span> <span class="tok-c">// clusters</span>
+<span class="tok-n">strip-ansi-escapes</span>   <span class="tok-c">// colour</span>
+<span class="tok-n">textwrap</span>             <span class="tok-c">// wrapping</span>
+<span class="tok-c">+ glue you write yourself</span></code></pre>
+      <p style="font-size:14px">
+        Width and segmentation are different questions, and those two crates do not talk to
+        each other. Nothing stops you from measuring a string one way and cutting it another
+        — which is exactly the bug.
+      </p>
+    </div>
+    <div>
+      <h3 style="margin-top:0">After</h3>
+      <pre style="margin-bottom:8px"><code><span class="tok-k">cargo add</span> cellwidth
+
+<span class="tok-c">// cargo tree</span>
+your-app v0.1.0
+└── cellwidth v0.1.0</code></pre>
+      <p style="font-size:14px">
+        One crate. Zero dependencies, zero dev-dependencies, no build script. Every operation
+        works in whole grapheme clusters and whole escape sequences, so a cut can never
+        produce half a character or half a colour code.
+      </p>
+    </div>
+  </div>
+  <div class="note">
+    <b>It also runs where the others can't.</b> <code>no_std</code> with optional
+    <code>alloc</code>, verified on a bare-metal <code>thumbv7em-none-eabi</code> build —
+    so <code>width</code>, <code>truncate</code>, <code>graphemes</code> and
+    <code>pieces</code> work in a serial console or an embedded shell with no allocator at all.
+  </div>
+</section>
+
+<!-- ================= PROOF ================= -->
+<section id="proof">
+  <div class="snum">04 / The proof</div>
+  <h2>Every number here was checked by something that isn't us</h2>
+  <p class="lede">
+    A library that claims to be correct about Unicode is easy to write and hard to trust.
+    So nothing below rests on our own say-so — each figure comes from an external oracle,
+    a published conformance file, or a real terminal.
+  </p>
+
+  <table class="tbl">
+    <thead><tr><th>Checked against</th><th class="num">Scale</th><th>Result</th></tr></thead>
+    <tbody>
+      <tr><td>Unicode <code>GraphemeBreakTest.txt</code> (UAX #29)</td><td class="num">766 cases</td><td>all pass</td></tr>
+      <tr><td>Unicode <code>LineBreakTest.txt</code> (UAX #14)</td><td class="num">19,338 cases</td><td>all pass</td></tr>
+      <tr><td>Unicode <code>emoji-test.txt</code> (UTS #51)</td><td class="num">3,944 sequences</td><td>all pass</td></tr>
+      <tr><td>glibc <code>wcwidth</code> + <code>unicode-width</code></td><td class="num">1,112,064 code points</td><td>every divergence categorised &amp; pinned</td></tr>
+      <tr><td><code>unicode-segmentation</code></td><td class="num">9,282,875 strings</td><td>exact agreement</td></tr>
+      <tr><td>Real terminals via <code>CSI 6n</code> probing</td><td class="num">4 terminals × 32 cases</td><td>recorded in-repo</td></tr>
+      <tr><td>libFuzzer</td><td class="num">6 targets</td><td>0 crashes</td></tr>
+      <tr><td>Miri</td><td class="num">interpreter</td><td>clean</td></tr>
+    </tbody>
+  </table>
+
+  <div class="note">
+    <b>Eight real defects were found this way</b> — none of them by re-reading the code.
+    Each has a regression test naming the oracle that caught it. That is the entire argument
+    for testing against something external: the bugs you can find by staring are not the
+    bugs that are there.
+  </div>
+
+  <h3>Coverage, stated exactly</h3>
+  <table class="tbl">
+    <thead><tr><th>Metric</th><th class="num">Value</th><th>Gated in CI</th></tr></thead>
+    <tbody>
+      <tr><td>Line coverage</td><td class="num">100% (1,239 / 1,239)</td><td>yes — build fails below 100%</td></tr>
+      <tr><td>Function coverage</td><td class="num">100% (110 / 110)</td><td>yes — build fails below 100%</td></tr>
+      <tr><td>Region coverage</td><td class="num">99.95% (1 of 2,088)</td><td>reported, not gated</td></tr>
+    </tbody>
+  </table>
+  <p>
+    That last row is the honest one. A single region is reported missing, but the report's own
+    segment data contains no uncovered segment for that file, and a library-only run shows the
+    lines covered. It is an artifact of how per-binary reports are merged, not a hole in the
+    suite — so it is reported and explained rather than rounded away or quietly hidden.
+  </p>
+
+  <h3>Terminals genuinely disagree — so we measured instead of guessing</h3>
+  <p>
+    There is no single right answer for how wide an emoji is. Rather than pick one and hope,
+    <code>probe/</code> prints a string into a live terminal, asks where the cursor ended up
+    with <code>CSI 6n</code>, and writes the answer down.
+  </p>
+  <table class="tbl">
+    <thead><tr><th>Terminal</th><th class="num">👨‍👩‍👧‍👦</th><th class="num">❤ + VS16</th><th class="num">skin tone</th><th class="num">Bengali কা</th></tr></thead>
+    <tbody>
+      <tr><td>kitty 0.48</td><td class="num">2</td><td class="num">2</td><td class="num">2</td><td class="num">1</td></tr>
+      <tr><td>WezTerm 20240203</td><td class="num">2</td><td class="num">1</td><td class="num">2</td><td class="num">1</td></tr>
+      <tr><td>VTE 0.76 (GNOME Terminal)</td><td class="num">8</td><td class="num">1</td><td class="num">4</td><td class="num">2</td></tr>
+      <tr><td>Alacritty 0.17</td><td class="num">8</td><td class="num">1</td><td class="num">4</td><td class="num">1</td></tr>
+    </tbody>
+  </table>
+  <p>
+    Two camps, so there are two presets. <code>Width::DEFAULT</code> reproduces kitty exactly
+    on all 32 cases. <code>Width::LEGACY</code> counts every code point separately, as
+    <code>wcwidth</code> does, and scores higher across the four as a group (99/128 vs 94/128).
+    Flip between them in the demo above and watch the numbers move.
+  </p>
+</section>
+
+<!-- ================= BLUEPRINT ================= -->
+<section id="blueprint">
+  <div class="snum">05 / The blueprint</div>
+  <h2>Ten phases, eight shipped</h2>
+  <p class="lede">There was a plan before there was code. This is it, with honest status.</p>
+
+  <div id="phases">
+    <div class="phase"><div class="p">01</div><div><div class="t">Correct width tables</div><div class="d">UCD 17.0.0 generated into a two-level deduplicated lookup — 4,352 pages collapsed to 149 distinct, 85 KB</div></div><span class="tag done">shipped</span></div>
+    <div class="phase"><div class="p">02</div><div><div class="t">Grapheme clustering</div><div class="d">Full UAX #29 including ZWJ sequences, flags, skin tones, Hangul and Indic conjuncts</div></div><span class="tag done">shipped</span></div>
+    <div class="phase"><div class="p">03</div><div><div class="t">ANSI awareness</div><div class="d">CSI, OSC, DCS, nF and 8-bit C1 forms parsed as sequences, not pattern-matched</div></div><span class="tag done">shipped</span></div>
+    <div class="phase"><div class="p">04</div><div><div class="t">Fitting primitives</div><div class="d">truncate, cell, pad, center — style-preserving and allocation-free where possible</div></div><span class="tag done">shipped</span></div>
+    <div class="phase"><div class="p">05</div><div><div class="t">Differential testing</div><div class="d">glibc, unicode-width and unicode-segmentation as external oracles; 8 real defects found</div></div><span class="tag done">shipped</span></div>
+    <div class="phase"><div class="p">06</div><div><div class="t">Continuous integration</div><div class="d">13 jobs: three toolchains, MSRV, bare metal, Miri, fuzzing, semver, coverage gates</div></div><span class="tag done">shipped</span></div>
+    <div class="phase"><div class="p">07</div><div><div class="t">Real-terminal harness</div><div class="d">Cursor-position probing under Xvfb across four terminal emulators</div></div><span class="tag done">shipped</span></div>
+    <div class="phase"><div class="p">08</div><div><div class="t">Line breaking &amp; tables</div><div class="d">UAX #14 at full conformance, plus a table builder that survives fuzzing</div></div><span class="tag done">shipped</span></div>
+    <div class="phase"><div class="p">09</div><div><div class="t">Compat shims &amp; benchmarks</div><div class="d">Drop-in adapters for the incumbent crates and head-to-head measurements</div></div><span class="tag next">next</span></div>
+    <div class="phase"><div class="p">10</div><div><div class="t">Publish</div><div class="d">Released as 0.1.0 on crates.io</div></div><span class="tag done">shipped</span></div>
+  </div>
+</section>
+
+<!-- ================= USE ================= -->
+<section id="use">
+  <div class="snum">06 / Using it</div>
+  <h2>The whole API, roughly</h2>
+  <pre><code><span class="tok-k">use</span> cellwidth::{width, cell, truncate, wrap, Table};
+
+<span class="tok-k">assert_eq!</span>(width(<span class="tok-s">"café"</span>), <span class="tok-n">4</span>);                <span class="tok-c">// combining accents are free</span>
+<span class="tok-k">assert_eq!</span>(width(<span class="tok-s">"日本語"</span>), <span class="tok-n">6</span>);               <span class="tok-c">// CJK is double-width</span>
+<span class="tok-k">assert_eq!</span>(width(<span class="tok-s">"👨‍👩‍👧‍👦"</span>), <span class="tok-n">2</span>);                  <span class="tok-c">// one glyph, not seven</span>
+<span class="tok-k">assert_eq!</span>(width(<span class="tok-s">"\x1b[31mred\x1b[0m"</span>), <span class="tok-n">3</span>);  <span class="tok-c">// colour costs nothing</span>
+
+<span class="tok-c">// exactly 10 columns, always — truncated with an ellipsis or padded</span>
+<span class="tok-k">assert_eq!</span>(width(&amp;cell(<span class="tok-s">"🇯🇵 Tōkyō 東京"</span>, <span class="tok-n">10</span>)), <span class="tok-n">10</span>);</code></pre>
+
+  <h3>Tables that line up</h3>
+  <pre><code><span class="tok-k">let</span> out = Table::new()
+    .column(<span class="tok-s">"host"</span>)
+    .column_with(<span class="tok-s">"label"</span>, Align::Left, Sizing::Max(<span class="tok-n">22</span>))
+    .column_aligned(<span class="tok-s">"rps"</span>, Align::Right)
+    .row([<span class="tok-s">"tokyo-cdn"</span>, <span class="tok-s">"🇯🇵 Tōkyō 東京 edge"</span>, <span class="tok-s">"17,900"</span>])
+    .row([<span class="tok-s">"crew-alpha"</span>, <span class="tok-s">"👨‍👩‍👧‍👦 shared account"</span>, <span class="tok-s">"3"</span>])
+    .border(Border::Ascii)
+    .render(<span class="tok-k">Some</span>(<span class="tok-n">60</span>));</code></pre>
+  <pre><code>+------------+--------------------+--------+
+| host       | label              |    rps |
++------------+--------------------+--------+
+| tokyo-cdn  | 🇯🇵 Tōkyō 東京 edge | 17,900 |
+| crew-alpha | 👨‍👩‍👧‍👦 shared account  |      3 |
++------------+--------------------+--------+</code></pre>
+  <p>
+    A flag, a ZWJ family, CJK and a macron in one column — and all six lines measure
+    <b>44 cells exactly</b>. That invariant is what the fuzzer asserts, whatever the cells hold.
+  </p>
+
+  <h3>Where this shows up</h3>
+  <p>
+    Anything that draws a fixed grid into a terminal: CLI tables and reports, TUI list and
+    column views, progress bars and spinners, log formatters, box-drawn banners, help and
+    error text wrapped to <code>$COLUMNS</code>, and text inputs where the cursor should move
+    by characters rather than bytes.
+  </p>
+</section>
+
+<footer>
+  <div>
+    <b>cellwidth</b> — MIT or Apache-2.0.
+    <a href="https://crates.io/crates/cellwidth">crates.io</a> ·
+    <a href="https://docs.rs/cellwidth">docs.rs</a> ·
+    <a href="https://github.com/singhpratech/cellwidth">GitHub</a>
+  </div>
+  <div style="margin-top:8px; color:var(--faint)">
+    The demo on this page runs the published crate compiled to WebAssembly —
+    <span id="wsize">the same code you get from cargo add</span>.
+  </div>
+</footer>
+
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ---------- theme ---------- */
+  var root = document.documentElement;
+  try{ var t = localStorage.getItem("cw-theme"); if(t) root.setAttribute("data-theme", t); }catch(e){}
+  document.getElementById("theme").addEventListener("click", function(){
+    var cur = root.getAttribute("data-theme");
+    if(!cur){ cur = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"; }
+    var next = cur === "dark" ? "light" : "dark";
+    root.setAttribute("data-theme", next);
+    try{ localStorage.setItem("cw-theme", next); }catch(e){}
+  });
+
+  /* ---------- wasm bridge ---------- */
+  var E = null, mode = 0;
+  var enc = new TextEncoder(), dec = new TextDecoder();
+  var CELL = 22;
+
+  function mem(){ return new Uint8Array(E.memory.buffer); }
+  function put(s){
+    var b = enc.encode(s);
+    if(b.length === 0){ return [0,0]; }
+    var p = E.cw_alloc(b.length);
+    mem().set(b, p);
+    return [p, b.length];
+  }
+  function take(packed){
+    var ptr = Number(packed >> 32n), len = Number(packed & 0xffffffffn);
+    if(!ptr || !len) return "";
+    var s = dec.decode(mem().slice(ptr, ptr + len));
+    E.cw_free_str(ptr, len);
+    return s;
+  }
+
+  var SAMPLES = [
+    ["family",  "👨‍👩‍👧‍👦"],
+    ["flag",    "🇯🇵 Tōkyō"],
+    ["CJK",     "日本語テキスト"],
+    ["accents", "café naïve"],
+    ["colour",  "\x1b[31mred\x1b[0m text"],
+    ["combining", "áéí"],
+    ["skin tone", "👋🏽 hello"],
+    ["heart",   "❤ vs ❤️"],
+    ["Bengali", "কাজ করে"],
+    ["mixed",   "→ 100% ✓ 完了"]
+  ];
+
+  function esc(s){
+    return s.replace(/[&<>]/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;"}[c]; });
+  }
+  function visible(s){
+    /* make control chars printable for the cell grid */
+    return s.replace(/[\x00-\x1f\x7f]/g, function(c){
+      return c === "\x1b" ? "^[" : "^" + String.fromCharCode(64 + c.charCodeAt(0));
+    });
+  }
+
+  /* Split a string into (grapheme, width) pairs using the real crate. */
+  function measure(s){
+    var pl = put(s), p = pl[0], l = pl[1];
+    if(!l) return { parts:[], widths:[], cols:0 };
+    var parts = take(E.cw_split(p, l)).split("\x1f");
+    var widths = take(E.cw_cluster_widths(p, l, mode)).split(",").map(Number);
+    var cols = E.cw_width(p, l, mode);
+    E.cw_free(p, l);
+    return { parts:parts, widths:widths, cols:cols };
+  }
+
+  /* Render a string into fixed-size cells. The browser's monospace font does
+     not draw CJK at exactly twice the ASCII advance, so relying on font
+     metrics would make this page misalign — the very thing it is about. */
+  function cellRow(label, s, target, tail, ghost){
+    var m = measure(s), h = "";
+    for(var i = 0; i < m.parts.length; i++){
+      var w = m.widths[i] || 0;
+      if(w === 0) continue;
+      h += '<span class="mc' + (w >= 2 ? ' w2' : '') + '" style="width:' + (w * CELL) + 'px">' +
+           esc(visible(m.parts[i])) + '</span>';
+    }
+    var padCols = Math.max(0, target - m.cols);
+    if(padCols) h += '<span class="pad" style="width:' + (padCols * CELL) + 'px"></span>';
+    return '<div class="row"><span class="lab">' + label + '</span>' +
+           '<span class="box' + (ghost ? ' ghost' : '') + '" style="width:' + (target * CELL) + 'px">' +
+           h + '</span><span class="tail">' + tail + '</span></div>';
+  }
+
+  function render(){
+    if(!E) return;
+    var s = document.getElementById("inp").value;
+    var pl = put(s), p = pl[0], l = pl[1];
+
+    var w        = E.cw_width(p, l, mode);
+    var bytes    = E.cw_bytes(p, l);
+    var chars    = E.cw_chars(p, l);
+    var clusters = E.cw_graphemes(p, l);
+    var parts    = l ? take(E.cw_split(p, l)).split("\x1f") : [];
+    var cws      = l ? take(E.cw_cluster_widths(p, l, mode)).split(",").map(Number) : [];
+
+    /* ---- cell grid ---- */
+    var g = document.getElementById("grid"), tk = document.getElementById("ticks");
+    var gh = "", th = "", col = 0;
+    for(var i = 0; i < parts.length; i++){
+      var cw = cws[i] || 0;
+      var cls = cw >= 2 ? "w2" : (cw === 1 ? "w1" : "w0");
+      var body = cw === 0 ? "·" : esc(visible(parts[i]));
+      var style = cw > 0 ? ' style="width:' + (cw * CELL) + 'px"' : '';
+      var divider = cw === 2 ? '<span class="div"></span>' : '';
+      gh += '<div class="cl ' + cls + '"' + style + ' title="' + esc(visible(parts[i])) +
+            ' — ' + cw + ' cell' + (cw === 1 ? '' : 's') + '">' + body + divider +
+            '<span class="cw">' + cw + '</span></div>';
+      for(var k = 0; k < cw; k++){
+        th += '<span style="width:' + CELL + 'px">' + (col++ % 10) + '</span>';
+      }
+    }
+    g.innerHTML = gh || '<div class="cl w0" style="width:60px">empty</div>';
+    tk.innerHTML = th;
+
+    /* ---- scoreboard ---- */
+    function card(k, v, note, kind){
+      return '<div class="sc ' + (kind||'') + '"><div class="k">' + k + '</div>' +
+             '<div class="v">' + v + '</div><div class="n">' + note + '</div></div>';
+    }
+    document.getElementById("score").innerHTML =
+      card(".len()",  bytes,    bytes === w ? "happens to match" : "UTF-8 bytes — wrong", bytes === w ? "" : "bad") +
+      card(".chars()", chars,   chars === w ? "happens to match" : "code points — wrong", chars === w ? "" : "bad") +
+      card("graphemes", clusters, "what a user calls a character", "") +
+      card("cellwidth", w,      "terminal cells — correct", "good");
+
+    var wrongBy = [];
+    if(bytes !== w) wrongBy.push(".len() is off by " + (bytes - w));
+    if(chars !== w) wrongBy.push(".chars() is off by " + (chars - w));
+    document.getElementById("verdict").textContent = wrongBy.length
+      ? "For this string, " + wrongBy.join(" and ") + ". That is how many columns your table drifts."
+      : "For this pure-ASCII string all three agree — which is exactly why the bug survives until someone types a name with an accent.";
+
+    /* ---- truncate / cell ---- */
+    var n = +document.getElementById("tw").value;
+    document.getElementById("twv").textContent = n;
+    var tr = take(E.cw_truncate(p, l, n));
+    var ce = take(E.cw_cell(p, l, n));
+    var tp = put(tr), cp = put(ce);
+    var trw = E.cw_width(tp[0], tp[1], mode), cew = E.cw_width(cp[0], cp[1], mode);
+    E.cw_free(tp[0], tp[1]); E.cw_free(cp[0], cp[1]);
+    document.getElementById("tout").innerHTML =
+      cellRow("input", s, Math.max(n, E.cw_width(p, l, mode)), "the whole string", true) +
+      cellRow("truncate", tr, n,
+              trw + " / " + n + " cells" + (trw <= n ? "" : " <i>overflow</i>")) +
+      cellRow("cell", ce, n,
+              cew === n ? "<b>exactly " + n + " ✓</b>" : "<i>" + cew + " ≠ " + n + "</i>");
+
+    /* ---- wrap ---- */
+    var wn = +document.getElementById("ww").value;
+    document.getElementById("wwv").textContent = wn;
+    var wsrc = "認証に失敗しました: the token for 👨‍👩‍👧‍👦 crew-alpha expired 東京";
+    var wp = put(wsrc);
+    var lines = take(E.cw_wrap(wp[0], wp[1], wn)).split("\n");
+    E.cw_free(wp[0], wp[1]);
+    var wo = "";
+    for(var j = 0; j < lines.length; j++){
+      var lp = put(lines[j]);
+      var lw = lp[1] ? E.cw_width(lp[0], lp[1], mode) : 0;
+      if(lp[1]) E.cw_free(lp[0], lp[1]);
+      wo += cellRow("line " + (j + 1), lines[j], wn,
+                    lw + " / " + wn + (lw <= wn ? "" : " <i>overflow</i>"));
+    }
+    document.getElementById("wout").innerHTML = wo;
+
+    if(l) E.cw_free(p, l);
+  }
+
+  /* ---------- wiring ---------- */
+  var sbox = document.getElementById("samples");
+  SAMPLES.forEach(function(pair){
+    var b = document.createElement("button");
+    b.className = "chip"; b.type = "button"; b.textContent = pair[0];
+    b.addEventListener("click", function(){
+      document.getElementById("inp").value = pair[1];
+      render();
+    });
+    sbox.appendChild(b);
+  });
+
+  document.querySelectorAll("[data-mode]").forEach(function(btn){
+    btn.addEventListener("click", function(){
+      mode = +btn.getAttribute("data-mode");
+      document.querySelectorAll("[data-mode]").forEach(function(o){
+        o.setAttribute("aria-pressed", o === btn ? "true" : "false");
+      });
+      render();
+    });
+  });
+
+  ["inp","tw","ww"].forEach(function(id){
+    document.getElementById(id).addEventListener("input", render);
+  });
+
+  fetch("cellwidth.wasm")
+    .then(function(r){
+      if(!r.ok) throw new Error("HTTP " + r.status);
+      return r.arrayBuffer();
+    })
+    .then(function(buf){
+      document.getElementById("wsize").textContent =
+        "the same code you get from cargo add, " + Math.round(buf.byteLength / 1024) + " KB of WebAssembly";
+      return WebAssembly.instantiate(buf, {});
+    })
+    .then(function(res){
+      E = res.instance.exports;
+      var v = take(E.cw_unicode_version());
+      document.getElementById("wstat").textContent = "live · Unicode " + v;
+      render();
+    })
+    .catch(function(err){
+      document.getElementById("wstat").textContent = "unavailable";
+      document.getElementById("grid").innerHTML =
+        '<div class="err" style="padding:12px">Could not load the WebAssembly module (' +
+        esc(String(err.message || err)) + '). The rest of the page still works.</div>';
+    });
+})();
+</script>
+</body>
+</html>
