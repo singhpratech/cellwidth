@@ -51,6 +51,8 @@
 //! `std` feature; measurement works with no allocator at all, and the
 //! `alloc` feature adds the functions that return owned strings.
 
+#![doc(html_logo_url = "https://singhpratech.github.io/cellwidth/icon.svg")]
+#![doc(html_favicon_url = "https://singhpratech.github.io/cellwidth/icon.svg")]
 #![cfg_attr(not(feature = "std"), no_std)]
 #![deny(missing_docs)]
 #![forbid(unsafe_code)]
