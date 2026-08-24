@@ -6,6 +6,35 @@ follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-08-24
+
+The API is stable from here: additions only in 1.x.
+
+### Added
+
+- `compat`, drop-in replacements for the traits of `unicode-width`
+  (`UnicodeWidthStr`, `UnicodeWidthChar`) and `unicode-segmentation`
+  (`UnicodeSegmentation`, with `GraphemeIndices`). Same names, same
+  signatures, cellwidth's answers. `UnicodeWidthChar` keeps the `None`-for-
+  control convention, verified identical across every code point;
+  `graphemes(s, false)` implements legacy grapheme clusters, verified against
+  `unicode-segmentation` on 9,282,875 strings in both modes.
+- A head-to-head benchmark against `unicode-width` and `unicode-segmentation`
+  in `oracles/examples/bench.rs`; results in the README.
+
+### Changed
+
+- `Width::LEGACY` (and any `Clusters::CodePoints` policy) no longer runs the
+  cluster segmenter it did not need: 396 ns → 118 ns on a 114-byte CJK string,
+  level with `unicode-width`.
+- `Ambiguous`, `Control`, `Clusters`, `Sizing` and `Border` are
+  `#[non_exhaustive]`, so a 1.x release can add a policy or a border style.
+
+### Fixed
+
+- The documentation of `wrap` still described the pre-0.1 whitespace
+  algorithm; it breaks at UAX #14 opportunities.
+
 ## [0.1.1] - 2026-08-24
 
 ### Changed
@@ -82,6 +111,7 @@ regression test naming the oracle that caught it:
 - Any escape ending in `m` was treated as an SGR colour code, so `wrap` injected
   resets into unstyled text.
 
-[Unreleased]: https://github.com/singhpratech/cellwidth/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/singhpratech/cellwidth/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/singhpratech/cellwidth/compare/v0.1.1...v1.0.0
 [0.1.1]: https://github.com/singhpratech/cellwidth/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/singhpratech/cellwidth/releases/tag/v0.1.0

@@ -81,8 +81,9 @@ fn every_emoji_is_one_cluster() {
 
 /// Segmentation must agree with `unicode-segmentation`, character for
 /// character, across a corpus wide enough to hit every rule.
-#[test]
-fn clusters_match_unicode_segmentation() {
+/// Every code point alone and paired with each kind of joiner, plus every
+/// emoji sequence in context.
+fn cluster_corpus() -> Vec<String> {
     let mut corpus: Vec<String> = Vec::new();
 
     // Every code point alone, and paired with each kind of joiner.
@@ -119,7 +120,12 @@ fn clusters_match_unicode_segmentation() {
             corpus.push(format!("a{s}b"));
         }
     }
+    corpus
+}
 
+#[test]
+fn clusters_match_unicode_segmentation() {
+    let corpus = cluster_corpus();
     let mut mismatches = 0;
     let mut first = Vec::new();
     for s in &corpus {
@@ -224,5 +230,120 @@ fn char_width_divergence_from_unicode_width_is_accounted_for() {
     assert!(
         report.is_empty(),
         "unicode-width divergence changed:\n{report}"
+    );
+}
+
+/// The compatibility shim reproduces `unicode-segmentation` in both of its
+/// modes, including the legacy clusters that drop GB9a, GB9b and GB9c.
+#[test]
+fn compat_segmentation_matches_unicode_segmentation_in_both_modes() {
+    use cellwidth::compat::UnicodeSegmentation as Ours;
+    use unicode_segmentation::UnicodeSegmentation as Theirs;
+
+    let corpus = cluster_corpus();
+    let mut mismatches = 0;
+    let mut first = Vec::new();
+    let mut legacy_differs = 0;
+    for s in &corpus {
+        for extended in [true, false] {
+            let ours: Vec<(usize, &str)> = Ours::grapheme_indices(s.as_str(), extended).collect();
+            let theirs: Vec<(usize, &str)> =
+                Theirs::grapheme_indices(s.as_str(), extended).collect();
+            if ours != theirs {
+                mismatches += 1;
+                if first.len() < 10 {
+                    first.push(format!(
+                        "  {s:?} extended={extended}\n    ours   {ours:?}\n    theirs {theirs:?}"
+                    ));
+                }
+            }
+            let plain: Vec<&str> = Ours::graphemes(s.as_str(), extended).collect();
+            assert_eq!(
+                plain,
+                Theirs::graphemes(s.as_str(), extended).collect::<Vec<_>>()
+            );
+        }
+        if Theirs::graphemes(s.as_str(), true).count()
+            != Theirs::graphemes(s.as_str(), false).count()
+        {
+            legacy_differs += 1;
+        }
+    }
+    assert_eq!(
+        mismatches,
+        0,
+        "{mismatches} of {} corpus strings segmented differently:\n{}",
+        corpus.len() * 2,
+        first.join("\n")
+    );
+    // The legacy mode has to be doing something, or agreement proves nothing.
+    assert!(
+        legacy_differs > 1000,
+        "only {legacy_differs} strings distinguish the modes"
+    );
+    eprintln!(
+        "unicode-segmentation compat: {} strings agree in both modes; {legacy_differs} distinguish them",
+        corpus.len()
+    );
+}
+
+/// The shim keeps `unicode-width`'s `None`-for-control convention on `char`,
+/// and on `str` its answers are exactly cellwidth's.
+#[test]
+fn compat_width_keeps_unicode_width_conventions() {
+    use cellwidth::compat::{UnicodeWidthChar as OurChar, UnicodeWidthStr as OurStr};
+    use unicode_width::{UnicodeWidthChar as TheirChar, UnicodeWidthStr as TheirStr};
+
+    let mut none_mismatch = 0;
+    let mut same_value = 0;
+    for cp in 0u32..=0x10FFFF {
+        let Some(c) = char::from_u32(cp) else {
+            continue;
+        };
+        let ours = OurChar::width(c);
+        let theirs = TheirChar::width(c);
+        if ours.is_none() != theirs.is_none() {
+            none_mismatch += 1;
+        }
+        if ours == theirs {
+            same_value += 1;
+        }
+        assert_eq!(
+            OurChar::width_cjk(c).is_none(),
+            TheirChar::width_cjk(c).is_none()
+        );
+    }
+    assert_eq!(
+        none_mismatch, 0,
+        "None must mean the same thing in both crates"
+    );
+    // Values differ only in the deliberate buckets pinned above; sanity-check
+    // that agreement is the overwhelming norm.
+    assert!(
+        same_value > 1_100_000,
+        "only {same_value} code points agree"
+    );
+
+    for s in cluster_corpus().iter().step_by(97) {
+        assert_eq!(OurStr::width(s.as_str()), cellwidth::width(s));
+        assert_eq!(
+            OurStr::width_cjk(s.as_str()),
+            cellwidth::Width::DEFAULT
+                .ambiguous(cellwidth::Ambiguous::Wide)
+                .of(s)
+        );
+    }
+    // Where the two crates differ on a string, the difference is the point.
+    // These pin the figures quoted in `src/compat.rs`.
+    assert_eq!(OurStr::width("👨‍👩‍👧‍👦"), 2);
+    assert_eq!(TheirStr::width("👨‍👩‍👧‍👦"), 2);
+    assert_eq!(OurStr::width("\x1b[31mred\x1b[0m"), 3);
+    assert_eq!(TheirStr::width("\x1b[31mred\x1b[0m"), 12);
+    assert_eq!(OurStr::width("क्षि"), 1);
+    assert_eq!(TheirStr::width("क्षि"), 3);
+    assert_eq!(OurStr::width("a\tb"), 9);
+    assert_eq!(TheirStr::width("a\tb"), 3);
+    eprintln!(
+        "unicode-width compat: None-set identical; {same_value} code points identical in value"
     );
 }

@@ -417,7 +417,7 @@ footer{padding:36px 0 52px; color:var(--dim); font-size:13.5px}
 
 <span class="tok-c">// cargo tree</span>
 your-app v0.1.0
-└── cellwidth v0.1.0</code></pre>
+└── cellwidth v1.0.0</code></pre>
       <p style="font-size:14px">
         One crate. Zero dependencies, zero dev-dependencies, no build script. Every operation
         works in whole grapheme clusters and whole escape sequences, so a cut can never
@@ -450,7 +450,7 @@ your-app v0.1.0
       <tr><td>Unicode <code>LineBreakTest.txt</code> (UAX #14)</td><td class="num">19,338 cases</td><td>all pass</td></tr>
       <tr><td>Unicode <code>emoji-test.txt</code> (UTS #51)</td><td class="num">3,944 sequences</td><td>all pass</td></tr>
       <tr><td>glibc <code>wcwidth</code> + <code>unicode-width</code></td><td class="num">1,112,064 code points</td><td>every divergence categorised &amp; pinned</td></tr>
-      <tr><td><code>unicode-segmentation</code></td><td class="num">9,282,875 strings</td><td>exact agreement</td></tr>
+      <tr><td><code>unicode-segmentation</code>, both cluster modes</td><td class="num">9,282,875 strings × 2</td><td>exact agreement</td></tr>
       <tr><td>Real terminals via <code>CSI 6n</code> probing</td><td class="num">4 terminals × 32 cases</td><td>recorded in-repo</td></tr>
       <tr><td>libFuzzer</td><td class="num">6 targets</td><td>0 crashes</td></tr>
       <tr><td>Miri</td><td class="num">interpreter</td><td>clean</td></tr>
@@ -506,7 +506,7 @@ your-app v0.1.0
 <!-- ================= BLUEPRINT ================= -->
 <section id="blueprint">
   <div class="snum">05 / The blueprint</div>
-  <h2>Ten phases, nine shipped</h2>
+  <h2>Ten phases, all shipped</h2>
   <p class="lede">There was a plan before there was code. This is it, with honest status.</p>
 
   <div id="phases">
@@ -518,8 +518,8 @@ your-app v0.1.0
     <div class="phase"><div class="p">06</div><div><div class="t">Continuous integration</div><div class="d">13 jobs: three toolchains, MSRV, bare metal, Miri, fuzzing, semver, coverage gates</div></div><span class="tag done">shipped</span></div>
     <div class="phase"><div class="p">07</div><div><div class="t">Real-terminal harness</div><div class="d">Cursor-position probing under Xvfb across four terminal emulators</div></div><span class="tag done">shipped</span></div>
     <div class="phase"><div class="p">08</div><div><div class="t">Line breaking &amp; tables</div><div class="d">UAX #14 at full conformance, plus a table builder that survives fuzzing</div></div><span class="tag done">shipped</span></div>
-        <div class="phase"><div class="p">09</div><div><div class="t">Publish</div><div class="d">Released as 0.1.0 on crates.io, with a live WebAssembly demo on this page</div></div><span class="tag done">shipped</span></div>
-    <div class="phase"><div class="p">10</div><div><div class="t">Compat shims &amp; benchmarks</div><div class="d">Drop-in adapters for the incumbent crates and head-to-head measurements</div></div><span class="tag next">next</span></div>
+        <div class="phase"><div class="p">09</div><div><div class="t">Publish</div><div class="d">Released to crates.io, with a live WebAssembly demo on this page</div></div><span class="tag done">shipped</span></div>
+    <div class="phase"><div class="p">10</div><div><div class="t">Compat shims &amp; benchmarks</div><div class="d">Drop-in <code>compat</code> traits for unicode-width and unicode-segmentation, oracle-tested in both cluster modes, plus head-to-head timings — then 1.0.0</div></div><span class="tag done">shipped</span></div>
   </div>
 </section>
 
@@ -564,6 +564,29 @@ your-app v0.1.0
     error text wrapped to <code>$COLUMNS</code>, and text inputs where the cursor should move
     by characters rather than bytes.
   </p>
+
+  <h3>Coming from <code>unicode-width</code> or <code>unicode-segmentation</code></h3>
+  <p style="font-size:14px">Same trait names, same method signatures, cellwidth's answers. The figures are measured by the oracle tests, not quoted.</p>
+  <pre><code><span class="tok-c">// use unicode_width::UnicodeWidthStr;</span>
+<span class="tok-k">use</span> cellwidth::compat::{UnicodeSegmentation, UnicodeWidthStr};
+
+<span class="tok-k">assert_eq!</span>(<span class="tok-s">"\x1b[31mred\x1b[0m"</span>.width(), <span class="tok-n">3</span>);  <span class="tok-c">// unicode-width 0.2.2: 12</span>
+<span class="tok-k">assert_eq!</span>(<span class="tok-s">"क्षि"</span>.width(), <span class="tok-n">1</span>);                <span class="tok-c">// unicode-width 0.2.2: 3</span>
+<span class="tok-k">assert_eq!</span>(<span class="tok-s">"a👍🏽🇯🇵"</span>.graphemes(<span class="tok-k">true</span>).count(), <span class="tok-n">3</span>);</code></pre>
+
+  <h3>Head to head</h3>
+  <p style="font-size:14px">Best of seven rounds of 100,000 calls. Read the answers before the timings: <code>unicode-width</code> neither segments clusters nor parses escapes, so on those inputs it does less work and returns a number the terminal will not honour. <code>Width::LEGACY</code> is the like-for-like model.</p>
+  <table class="tbl">
+    <thead><tr><th>input</th><th class="num">cellwidth::width</th><th class="num">Width::LEGACY</th><th class="num">unicode-width</th><th>answers</th></tr></thead>
+    <tbody>
+      <tr><td>ascii, 69 B</td><td class="num">49 ns</td><td class="num">46 ns</td><td class="num">54 ns</td><td>69 / 69 / 69</td></tr>
+      <tr><td>cjk, 114 B</td><td class="num">413 ns</td><td class="num">118 ns</td><td class="num">85 ns</td><td>76 / 76 / 76</td></tr>
+      <tr><td>emoji, 126 B</td><td class="num">644 ns</td><td class="num">131 ns</td><td class="num">132 ns</td><td>77 / 84 / 77</td></tr>
+      <tr><td>ansi, 80 B</td><td class="num">129 ns</td><td class="num">129 ns</td><td class="num">62 ns</td><td>42 / 42 / <b>80</b></td></tr>
+      <tr><td>table row, 64 B</td><td class="num">263 ns</td><td class="num">84 ns</td><td class="num">59 ns</td><td>38 / 40 / <b>47</b></td></tr>
+    </tbody>
+  </table>
+  <p style="font-size:14px">Grapheme iteration runs about twice as fast as <code>unicode-segmentation</code> on every input (233 ns vs 519 ns for the CJK string).</p>
 </section>
 
 <footer>

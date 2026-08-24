@@ -25,6 +25,7 @@ pub enum Align {
 
 /// How wide a column should be.
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+#[non_exhaustive]
 pub enum Sizing {
     /// As wide as its widest cell. The default.
     #[default]
@@ -37,6 +38,7 @@ pub enum Sizing {
 
 /// The characters a table is drawn with.
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+#[non_exhaustive]
 pub enum Border {
     /// Box drawing characters. The default.
     #[default]

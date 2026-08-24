@@ -82,9 +82,19 @@ pub(crate) struct Breaker {
     incb_consonant: bool,
     /// ...and at least one of them was a Linker.
     incb_linker: bool,
+    /// Legacy grapheme clusters: GB9a, GB9b and GB9c do not apply.
+    legacy: bool,
 }
 
 impl Breaker {
+    /// A breaker for legacy (non-extended) grapheme clusters.
+    pub(crate) fn legacy() -> Self {
+        Breaker {
+            legacy: true,
+            ..Breaker::default()
+        }
+    }
+
     /// Feed the next character; returns `true` if a cluster boundary falls
     /// *before* it.
     pub(crate) fn is_boundary(&mut self, c: char) -> bool {
@@ -117,16 +127,19 @@ impl Breaker {
         if matches!(l, Gcb::Lvt | Gcb::T) && r == Gcb::T {
             return false;
         }
-        // GB9, GB9a, GB9b.
-        if r.is_extend_like() || r == Gcb::SpacingMark {
+        // GB9: extenders and ZWJ never start a cluster.
+        if r.is_extend_like() {
             return false;
         }
-        if l == Gcb::Prepend {
-            return false;
-        }
-        // GB9c: consonant + linker + consonant is one Indic conjunct.
-        if r == Gcb::InCBConsonant && self.incb_consonant && self.incb_linker {
-            return false;
+        // GB9a, GB9b and GB9c only apply to extended clusters.
+        if !self.legacy {
+            if r == Gcb::SpacingMark || l == Gcb::Prepend {
+                return false;
+            }
+            // GB9c: consonant + linker + consonant is one Indic conjunct.
+            if r == Gcb::InCBConsonant && self.incb_consonant && self.incb_linker {
+                return false;
+            }
         }
         // GB11: emoji ZWJ sequence, e.g. the family emoji.
         if l == Gcb::Zwj && self.pict_seq && r == Gcb::ExtPict {
@@ -195,6 +208,14 @@ impl<'a> Graphemes<'a> {
             start: 0,
             pos: 0,
             breaker: Breaker::default(),
+        }
+    }
+
+    /// Legacy (non-extended) grapheme clusters, for the compatibility shim.
+    pub(crate) fn new_legacy(s: &'a str) -> Self {
+        Graphemes {
+            breaker: Breaker::legacy(),
+            ..Graphemes::new(s)
         }
     }
 

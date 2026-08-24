@@ -11,6 +11,7 @@ use crate::tables::{entry, WIDTH_MASK};
 /// single-width. There is no correct answer available from the text alone: it
 /// depends on the font the terminal is using.
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+#[non_exhaustive]
 pub enum Ambiguous {
     /// One column. Correct for Western locales and the default.
     #[default]
@@ -22,6 +23,7 @@ pub enum Ambiguous {
 
 /// How to count C0/C1 control characters.
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+#[non_exhaustive]
 pub enum Control {
     /// Zero columns: the terminal consumes them without moving the cursor.
     /// This is the default and matches what actually happens on screen.
@@ -39,6 +41,7 @@ pub enum Control {
 /// source of disagreement between terminals, so it is a policy rather than a
 /// guess.
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+#[non_exhaustive]
 pub enum Clusters {
     /// Every grapheme cluster is one glyph, sized by its base character, with
     /// presentation selectors and flag pairing honoured.
@@ -315,6 +318,19 @@ impl Width {
         // Pure-ASCII printable runs need no segmentation at all.
         if s.is_ascii() && s.bytes().all(|b| (0x20..0x7F).contains(&b)) {
             return s.len();
+        }
+        // The per-code-point model needs no segmentation: every cluster's
+        // advance is the sum of its characters', and a tab is always a cluster
+        // of its own, so the running column is the same either way.
+        if self.clusters == Clusters::CodePoints {
+            for c in s.chars() {
+                col += if c == '\t' {
+                    self.tab_advance(col)
+                } else {
+                    self.of_char(c)
+                };
+            }
+            return col - start_col;
         }
         for cluster in Graphemes::new(s) {
             col += self.advance(cluster, col);

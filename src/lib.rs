@@ -44,6 +44,18 @@
 //! assert_eq!(CJK.of("°C"), 3);
 //! ```
 //!
+//! # Coming from `unicode-width` or `unicode-segmentation`
+//!
+//! The [`compat`] module has drop-in replacements for their traits, so a
+//! migration is an import change:
+//!
+//! ```
+//! use cellwidth::compat::{UnicodeSegmentation, UnicodeWidthStr};
+//!
+//! assert_eq!("👨‍👩‍👧‍👦".width(), 2);
+//! assert_eq!("🇯🇵🇯🇵".graphemes(true).count(), 2);
+//! ```
+//!
 //! # No dependencies
 //!
 //! None, and no build script: the Unicode tables are generated ahead of time by
@@ -61,6 +73,7 @@
 extern crate alloc;
 
 mod ansi;
+pub mod compat;
 #[cfg(feature = "alloc")]
 mod fit;
 pub(crate) mod grapheme;
@@ -173,7 +186,13 @@ pub fn pad_start(s: &str, width: usize) -> Cow<'_, str> {
     Width::DEFAULT.pad_start(s, width)
 }
 
-/// Break `s` into lines of at most `width` columns, breaking at whitespace.
+/// Break `s` into lines of at most `width` columns, at UAX #14 line break
+/// opportunities, using [`Width::DEFAULT`].
+///
+/// ```
+/// # use cellwidth::wrap;
+/// assert_eq!(wrap("日本語のテキスト", 6), ["日本語", "のテキ", "スト"]);
+/// ```
 #[cfg(feature = "alloc")]
 pub fn wrap(s: &str, width: usize) -> Vec<String> {
     Width::DEFAULT.wrap(s, width)

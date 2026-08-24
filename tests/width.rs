@@ -320,3 +320,15 @@ fn char_width_covers_controls_and_tabs() {
         2
     );
 }
+
+#[test]
+fn legacy_model_expands_tabs_by_position() {
+    use cellwidth::Width;
+    // The per-code-point model skips segmentation, so its tab handling has its
+    // own path; a tab still advances to the next stop, from wherever it sits.
+    assert_eq!(Width::LEGACY.of("a\tb"), 9);
+    assert_eq!(Width::LEGACY.of_at("\t", 4), 4);
+    assert_eq!(Width::LEGACY.tab_stop(4).of("日\tb"), 5);
+    assert_eq!(Width::LEGACY.tab_stop(0).of("日\tb"), 3);
+    assert_eq!(Width::LEGACY.of("日\tb"), Width::DEFAULT.of("日\tb"));
+}

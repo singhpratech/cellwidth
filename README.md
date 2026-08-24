@@ -67,6 +67,7 @@ $ cargo run --example table
 | `Table` | a grid that lines up: sizing, alignment, borders, wrapping cells |
 | `graphemes(s)` | iterate user-perceived characters (UAX #29) |
 | `strip_ansi(s)` / `pieces(s)` | separate text from escape sequences |
+| `compat::*` | drop-in traits for code written against `unicode-width` or `unicode-segmentation` |
 
 Every operation works in whole grapheme clusters and whole escape sequences, so
 a cut never produces half a character or half a colour code.
@@ -84,6 +85,38 @@ Without this crate, the same job usually takes four:
 `strip-ansi-escapes` for colour, `textwrap` for wrapping — plus the glue between
 them, which is where the bugs live, because width and segmentation are different
 questions and those two crates do not talk to each other.
+
+## Migrating from `unicode-width` or `unicode-segmentation`
+
+The `compat` module has traits with the same names and method signatures as
+theirs, so switching is an import change:
+
+```rust
+// use unicode_width::UnicodeWidthStr;
+// use unicode_segmentation::UnicodeSegmentation;
+use cellwidth::compat::{UnicodeSegmentation, UnicodeWidthStr};
+
+assert_eq!("日本語".width(), 6);
+assert_eq!("°C".width_cjk(), 3);
+assert_eq!("a👍🏽🇯🇵".graphemes(true).count(), 3);
+```
+
+The method names are the same; the answers are cellwidth's. Every figure below
+is measured by `oracles/tests/differential.rs`, which fails if either crate
+changes:
+
+| input | `unicode-width` 0.2.2 | `cellwidth` | why |
+|---|---:|---:|---|
+| `"\x1b[31mred\x1b[0m"` | 12 | 3 | escape sequences occupy no columns |
+| `"क्षि"` | 3 | 1 | an Indic conjunct is one glyph |
+| `"a\tb"` | 3 | 9 | a tab advances to the next stop |
+| `"👨‍👩‍👧‍👦"` | 2 | 2 | both handle ZWJ sequences |
+
+`UnicodeWidthChar` keeps `unicode-width`'s convention of `None` for control
+characters — the two crates return `None` for exactly the same set — and
+`UnicodeSegmentation::graphemes(s, false)` implements legacy grapheme clusters
+(no GB9a/GB9b/GB9c), checked against `unicode-segmentation` on 9,282,875
+strings in both modes. Word and sentence segmentation are not provided.
 
 ## Use cases
 
@@ -230,7 +263,8 @@ allocator, where `width`, `truncate`, `graphemes` and `pieces` still function.
 - Every code point was **diffed against glibc's `wcwidth`**. The 178 remaining
   disagreements are deliberate and pinned in `tests/width.rs`.
 - Segmentation is checked against **`unicode-segmentation`** across 9,282,875
-  generated strings, with exact agreement, and widths against
+  generated strings, in both extended and legacy cluster modes, with exact
+  agreement, and widths against
   **`unicode-width`** across all 1,112,064 code points, where every divergence
   is sorted into a bucket with a written reason.
 - **33.7 million fuzz executions** across six targets, no crashes.
@@ -296,19 +330,35 @@ headlessly under Xvfb, so it works over ssh.
 
 ## Performance
 
-One table lookup per code point; no allocation on the measuring path.
+One table lookup per code point; no allocation on the measuring path. Measured
+head-to-head against the incumbent crates, best of seven rounds of 100,000
+calls, on the same inputs
+(`cargo run --release --manifest-path oracles/Cargo.toml --example bench`):
 
-```
-width()  ascii             51 ns  1267 MB/s
-         cjk              407 ns   279 MB/s
-         emoji            580 ns   185 MB/s
-         ansi             138 ns   532 MB/s
-         table row        250 ns   248 MB/s
-truncate() on a table row 192 ns   (no allocation)
-cell()     on a table row 588 ns   (one allocation)
-```
+| input | bytes | `cellwidth::width` | `Width::LEGACY` | `unicode-width` | answers |
+|---|---:|---:|---:|---:|---|
+| ascii | 69 | 49 ns | 46 ns | 54 ns | 69 / 69 / 69 |
+| cjk | 114 | 413 ns | 118 ns | 85 ns | 76 / 76 / 76 |
+| emoji | 126 | 644 ns | 131 ns | 132 ns | 77 / 84 / 77 |
+| ansi | 80 | 129 ns | 129 ns | 62 ns | 42 / 42 / 80 |
+| table row | 64 | 263 ns | 84 ns | 59 ns | 38 / 40 / 47 |
 
-Best of five runs. `cargo run --release --example bench`
+Read the `answers` column before the timings. `unicode-width` does not segment
+into clusters and does not parse escape sequences, so on emoji and ANSI input
+it does strictly less work and returns a number a terminal will not honour.
+`Width::LEGACY` is the like-for-like per-code-point model, and runs at the same
+speed. The default cluster-aware model costs 3–5× on non-ASCII text; that is
+the price of the right answer, and it is still sub-microsecond for a table row.
+
+Grapheme iteration is about twice as fast as `unicode-segmentation`:
+
+| input | clusters | `cellwidth::graphemes` | `unicode-segmentation` |
+|---|---:|---:|---:|
+| ascii | 69 | 382 ns | 698 ns |
+| cjk | 38 | 233 ns | 519 ns |
+| emoji | 68 | 466 ns | 943 ns |
+| ansi | 80 | 477 ns | 833 ns |
+| table row | 41 | 247 ns | 472 ns |
 
 ## Limitations, honestly
 
@@ -372,6 +422,7 @@ terminal columns wide — that is what the fuzzer checks, whatever the cells hol
 ```sh
 cargo test                                     # the crate's own suite, offline
 cargo test --manifest-path oracles/Cargo.toml  # differential vs other crates
+cargo run --release --manifest-path oracles/Cargo.toml --example bench  # head-to-head
 cargo +nightly miri test -p cellwidth          # 50 tests under the interpreter
 cargo llvm-cov -p cellwidth --all-features \
   --ignore-filename-regex 'tables\.rs' --fail-under-lines 100
@@ -380,7 +431,7 @@ cd fuzz && cargo +nightly fuzz run cell
 
 | | |
 |---|---|
-| Tests | 89 standalone, 93 with oracles |
+| Tests | 101 standalone, 107 with oracles |
 | Conformance | 766 UAX #29 + 19,338 UAX #14 + 3,944 emoji sequences |
 | Line coverage | 100% (1,239 / 1,239), gated in CI |
 | Function coverage | 100% (110 / 110), gated in CI |

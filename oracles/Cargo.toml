@@ -25,4 +25,8 @@ path = "examples/diff_oracles.rs"
 name = "diff_strings"
 path = "examples/diff_strings.rs"
 
+[[example]]
+name = "bench"
+path = "examples/bench.rs"
+
 [workspace]
