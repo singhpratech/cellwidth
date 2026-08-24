@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="cellwidth">
+  <title>cellwidth</title>
+  <!-- The mark is the thesis: a one-cell glyph beside a glyph that spans two.
+       Amber solid = occupied cell. Outlined pair = one glyph, two cells. -->
+  <rect width="64" height="64" rx="13" fill="#0b0d10"/>
+  <!-- baseline rule -->
+  <rect x="8" y="49" width="48" height="2" rx="1" fill="#ffb454" opacity=".28"/>
+  <!-- single-cell glyph -->
+  <rect x="9" y="16" width="13" height="28" rx="2" fill="#ffb454"/>
+  <!-- double-width glyph: one box across two cells, split by a dotted rule -->
+  <rect x="27" y="16" width="28" height="28" rx="2" fill="none" stroke="#ffb454" stroke-width="3"/>
+  <line x1="41" y1="19" x2="41" y2="41" stroke="#ffb454" stroke-width="2" stroke-dasharray="3 3" opacity=".65"/>
+</svg>

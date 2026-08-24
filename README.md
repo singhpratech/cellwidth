@@ -1,3 +1,9 @@
+<p align="center">
+  <a href="https://singhpratech.github.io/cellwidth/">
+    <img src="docs/og.png" alt="cellwidth — terminal display width that gets emoji, CJK and ANSI colour right" width="820">
+  </a>
+</p>
+
 # cellwidth
 
 [![CI](https://github.com/singhpratech/cellwidth/actions/workflows/ci.yml/badge.svg)](https://github.com/singhpratech/cellwidth/actions/workflows/ci.yml)
