@@ -9,7 +9,7 @@ categories = ["command-line-interface", "text-processing", "no-std"]
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/singhpratech/cellwidth"
 readme = "README.md"
-exclude = ["tools/", "ucd/", "fuzz/", "oracles/"]
+exclude = ["tools/", "ucd/", "fuzz/", "oracles/", "probe/", "web/", "docs/", ".github/"]
 
 # docs.rs builds with every feature so the alloc-only APIs are documented.
 # Feature labelling is automatic on current rustdoc; no cfg needed.

@@ -22,7 +22,7 @@ jobs:
       matrix:
         rust: [stable, beta, nightly]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ matrix.rust }}
@@ -36,7 +36,7 @@ jobs:
     name: feature combinations
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       # `std` implies `alloc`, so these three are the whole lattice.
@@ -49,7 +49,7 @@ jobs:
     name: no_std on a bare-metal target
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: thumbv7em-none-eabi
@@ -63,7 +63,7 @@ jobs:
     name: MSRV 1.75
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@1.75.0
       - uses: Swatinem/rust-cache@v2
       # The oracle package needs a newer compiler than the library does, so the
@@ -76,7 +76,7 @@ jobs:
     name: differential vs other implementations
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       # The only job that needs the network: it builds unicode-width and
@@ -88,7 +88,7 @@ jobs:
     name: fmt, clippy, docs
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
@@ -107,7 +107,7 @@ jobs:
     name: miri
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@nightly
         with:
           components: miri
@@ -124,11 +124,13 @@ jobs:
     name: coverage
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: llvm-tools-preview
-      - uses: taiki-e/install-action@cargo-llvm-cov
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-llvm-cov
       - uses: Swatinem/rust-cache@v2
       # Measured on cellwidth's own suite, so coverage never depends on an
       # external crate. The generated tables are data, not logic.
@@ -157,9 +159,11 @@ jobs:
       matrix:
         target: [width, truncate, cell, lossless, wrap, table]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@nightly
-      - uses: taiki-e/install-action@cargo-fuzz
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-fuzz
       - uses: Swatinem/rust-cache@v2
       # A short run per PR. The long campaigns are run by hand; this exists to
       # catch a target that stops building or breaks on its seed corpus.
@@ -171,11 +175,13 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
       - uses: dtolnay/rust-toolchain@stable
-      - uses: taiki-e/install-action@cargo-semver-checks
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-semver-checks
       - uses: Swatinem/rust-cache@v2
       # Compares against the base branch rather than a published version, so
       # this works before the first release too.
@@ -185,7 +191,7 @@ jobs:
     name: publish dry run
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - run: cargo publish --dry-run -p cellwidth --locked
@@ -198,7 +204,7 @@ jobs:
     if: github.event_name == 'schedule'
     continue-on-error: true
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - name: install terminals
@@ -219,5 +225,5 @@ jobs:
     # pull request that has nothing to do with it.
     if: github.event_name == 'schedule'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - run: ./tools/check_ucd_version.sh
