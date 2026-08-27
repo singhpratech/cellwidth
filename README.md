@@ -86,6 +86,20 @@ Without this crate, the same job usually takes four:
 them, which is where the bugs live, because width and segmentation are different
 questions and those two crates do not talk to each other.
 
+## Stability
+
+0.1.0, 0.1.1, 1.0.0 and 1.0.1 were all published on 24 August 2026. That is
+not a version-number play; the crate was written against a fixed ten-phase
+blueprint and 1.0.0 is the release in which the last phase landed. 0.1.1 added
+the docs.rs logo, 1.0.0 added the `compat` traits and froze the API, 1.0.1
+changed two metadata fields. The [changelog](CHANGELOG.md) has every diff.
+
+1.0 means: additions only in 1.x. Public enums are `#[non_exhaustive]`, the
+`compat` traits are sealed, and CI runs `cargo-semver-checks` on every push,
+so a breaking change cannot be published by accident. Unicode table updates
+ship as minor releases and are called out in the changelog. There will be no
+release without a reason.
+
 ## Migrating from `unicode-width` or `unicode-segmentation`
 
 The `compat` module has traits with the same names and method signatures as
